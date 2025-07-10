@@ -1,16 +1,12 @@
-#include <Array.au3>
-;~ #RequireAdmin
 Global Const $hNTDLL = DllOpen("ntdll.dll")
 Global Const $hKERNEL32 = DllOpen("kernel32.dll")
 Global Const $hIPHLPAPI = DllOpen("iphlpapi.dll")
 Global Const $hPSAPI = DllOpen("psapi.dll")
 Global Const $hWTSAPI32 = DllOpen("wtsapi32.dll")
-Global Const $hADVAPI32 = DllOpen("advapi32.dll")
 Global $aTCPArray
 
 Global Const $sSystemModule = _CV_SystemModuleInformation()
 
-;~ _CV_GetPrivilege_SEDEBUG()
 Global $iIsAdmin = IsAdmin()
 If Not $iIsAdmin  Then
    MsgBox(0, "", "Failed to get admin privalages")
@@ -212,49 +208,6 @@ Func _CV_GetConnections(ByRef $aTCPArray)
 	EndIf
 	Return 1
 EndFunc   ;==>_CV_GetConnections
-
-Func _CV_GetPrivilege_SEDEBUG()
-	Local $aCall = DllCall($hKERNEL32, "handle", "GetCurrentProcess")
-	If @error Then Return SetError(1, 0, 0)
-	Local $hCurrentProcess = $aCall[0]
-	$aCall = DllCall($hADVAPI32, "bool", "OpenProcessToken", _
-			"handle", $hCurrentProcess, _
-			"dword", 32, _  ; TOKEN_ADJUST_PRIVILEGES
-			"ptr*", 0)
-	If @error Or Not $aCall[0] Then Return SetError(2, 0, 0)
-	Local $hToken = $aCall[3]
-	Local $tLUID = DllStructCreate("dword LowPart;" & _
-			"int HighPart")
-	$aCall = DllCall($hADVAPI32, "bool", "LookupPrivilegeValueW", _
-			"wstr", "", _
-			"wstr", "SeDebugPrivilege", _ ; SE_DEBUG_NAME
-			"ptr", DllStructGetPtr($tLUID))
-	If @error Or Not $aCall[0] Then
-		DllCall($hKERNEL32, "bool", "CloseHandle", "handle", $hToken)
-		Return SetError(3, 0, 0)
-	EndIf
-	Local $tTOKEN_PRIVILEGES = DllStructCreate("dword PrivilegeCount;" & _
-			"dword LUIDLowPart;" & _
-			"int LUIDHighPart;" & _
-			"dword Attributes")
-	DllStructSetData($tTOKEN_PRIVILEGES, "PrivilegeCount", 1) ; just one
-	DllStructSetData($tTOKEN_PRIVILEGES, "LUIDLowPart", DllStructGetData($tLUID, "LowPart"))
-	DllStructSetData($tTOKEN_PRIVILEGES, "LUIDHighPart", DllStructGetData($tLUID, "HighPart"))
-	DllStructSetData($tTOKEN_PRIVILEGES, "Attributes", 2) ; SE_PRIVILEGE_ENABLED
-	$aCall = DllCall($hADVAPI32, "bool", "AdjustTokenPrivileges", _
-			"handle", $hToken, _
-			"int", 0, _
-			"ptr", DllStructGetPtr($tTOKEN_PRIVILEGES), _
-			"dword", 0, _
-			"ptr", 0, _
-			"ptr", 0)
-	If @error Or Not $aCall[0] Then
-		DllCall($hKERNEL32, "bool", "CloseHandle", "handle", $hToken)
-		Return SetError(4, 0, 0)
-	EndIf
-	DllCall($hKERNEL32, "bool", "CloseHandle", "handle", $hToken)
-	Return 1 ; success
-EndFunc   ;==>_CV_GetPrivilege_SEDEBUG
 
 Func _CV_DisableConnectionSimple($LocIP, $LocPort, $RemIP, $RemPort)
 
