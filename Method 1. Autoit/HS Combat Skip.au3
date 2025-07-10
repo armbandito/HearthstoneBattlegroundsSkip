@@ -5,8 +5,6 @@ Global Const $hPSAPI = DllOpen("psapi.dll")
 Global Const $hWTSAPI32 = DllOpen("wtsapi32.dll")
 Global $aTCPArray
 
-Global Const $sSystemModule = _CV_SystemModuleInformation()
-
 Global $iIsAdmin = IsAdmin()
 If Not $iIsAdmin  Then
    MsgBox(0, "", "Failed to get admin privalages")
@@ -130,11 +128,7 @@ Func _CV_GetExtendedTcpTable()
 					$aTCPTable[$i][0] = $aProcesses[$j][0]
 					$aTCPTable[$i][7] = _CV_GetPIDFileName($aProcesses[$j][1])
 					If Not $aTCPTable[$i][7] Then
-						If $aTCPTable[$i][0] = $sSystemModule Then
-							$aTCPTable[$i][7] = @SystemDir & "\" & $sSystemModule
-						Else
 							$aTCPTable[$i][7] = "-"
-						EndIf
 					EndIf
 					If Not $aTCPTable[$i][0] Then $aTCPTable[$i][0] = $aProcesses[$j][0]
 					$aTCPTable[$i][8] = $aProcesses[$j][2]
@@ -186,7 +180,7 @@ Func _CV_ProcessList()
 		$pString = DllStructGetData($tWTS_PROCESS_INFO, "ProcessName")
 		$iStringLen = _CV_PtrStringLenW($pString)
 		$aOut[$i][0] = DllStructGetData(DllStructCreate("wchar[" & $iStringLen + 1 & "]", $pString), 1)
-		If $aOut[$i][0] = "System" Then $aOut[$i][0] = $sSystemModule ; & " (System)"
+		If $aOut[$i][0] = "System" Then $aOut[$i][0] = "" ; & " (System)"
 		$aOut[$i][1] = DllStructGetData($tWTS_PROCESS_INFO, "ProcessId")
 		$aOut[$i][2] = ""
 	Next
@@ -265,39 +259,6 @@ Func _CV_DisableConnectionSimple($LocIP, $LocPort, $RemIP, $RemPort)
 	If @error Or $aCall[0] Then Return SetError(2, 0, 0)
 	Return 1
  EndFunc   ;==>_CV_DisableConnection
-
-Func _CV_SystemModuleInformation()
-	Local $aCall = DllCall($hNTDLL, "long", "NtQuerySystemInformation", _
-			"dword", 11, _ ; SystemModuleInformation
-			"ptr", 0, _
-			"dword", 0, _
-			"dword*", 0)
-	If @error Then Return SetError(1, 0, "")
-	Local $iSize = $aCall[4]
-	Local $tBufferRaw = DllStructCreate("byte[" & $iSize & "]")
-	Local $pBuffer = DllStructGetPtr($tBufferRaw)
-	$aCall = DllCall($hNTDLL, "long", "NtQuerySystemInformation", _
-			"dword", 11, _ ; SystemModuleInformation
-			"ptr", $pBuffer, _
-			"dword", $iSize, _
-			"dword*", 0)
-	If @error Then Return SetError(2, 0, "")
-	Local $pPointer = $pBuffer
-	Local $tSYSTEM_MODULE_Modified = DllStructCreate("dword_ptr ModulesCount;" & _
-			"dword_ptr Reserved[2];" & _
-			"ptr ImageBaseAddress;" & _
-			"dword ImageSize;" & _
-			"dword Flags;" & _
-			"word Index;" & _
-			"word Unknown;" & _
-			"word LoadCount;" & _
-			"word ModuleNameOffset;" & _
-			"char ImageName[256]", _
-			$pPointer)
-	Local $iNameOffset = DllStructGetData($tSYSTEM_MODULE_Modified, "ModuleNameOffset")
-	Local $sImageName = DllStructGetData($tSYSTEM_MODULE_Modified, "ImageName")
-	Return StringTrimLeft($sImageName, $iNameOffset)
- EndFunc   ;==>_CV_SystemModuleInformation
 
 Func _CV_GetPIDFileName($iPID)
 	Local $aCall = DllCall($hKERNEL32, "ptr", "OpenProcess", _
