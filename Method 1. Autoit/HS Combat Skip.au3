@@ -7,7 +7,8 @@ Global $aTCPArray
 
 Global $iIsAdmin = IsAdmin()
 If Not $iIsAdmin  Then
-   MsgBox(0, "", "Failed to get admin privalages")
+   MsgBox(0, "Hearthstone Battle Skip", "Failed to get admin privalages")
+   Exit
 EndIf
 
 HotKeySet("{F5}", "_DropHearthstone")
@@ -17,15 +18,23 @@ While 1
 WEnd
 
 Func _DropHearthstone()
-   _CV_GetConnections($aTCPArray)
+   $ret = _CV_GetConnections($aTCPArray)
+   if $ret Then
+	  Return 1
+   EndIf
 
+   Local $closedcon = False
    For $x=0 to UBound($aTCPArray) -1
 	  Local $name = $aTCPArray[$x][0]
 	  Local $remoteport = $aTCPArray[$x][4]
 	  If $name == "Hearthstone.exe" And $remoteport == "3724" Then
 		 _CV_DisableConnectionSimple($aTCPArray[$x][1], $aTCPArray[$x][2], $aTCPArray[$x][3], $aTCPArray[$x][4])
+		 Return 0
 	  EndIf
    Next
+
+   ;didnt close connection
+   MsgBox(0, "Hearthstone Battle Skip", "Failed to find connection, you are not in a match, or your game is already over.")
 EndFunc
 
 Func _CV_GetExtendedTcpTable()
@@ -198,9 +207,10 @@ Func _CV_GetConnections(ByRef $aTCPArray)
 	$aTCPArray = _CV_GetExtendedTcpTable()
 	$iExtendedTCP = 1
 	If @error Then
-	  Exit -2
+	  MsgBox(0, "Hearthstone Battle Skip", "Failed to get list of TCP Connections error: " & @error)
+	  Return 1
 	EndIf
-	Return 1
+	Return 0
 EndFunc   ;==>_CV_GetConnections
 
 Func _CV_DisableConnectionSimple($LocIP, $LocPort, $RemIP, $RemPort)
