@@ -1,7 +1,7 @@
 @echo off
 if not DEFINED IS_MINIMIZED set IS_MINIMIZED=1 && start "" /min "%~dpnx0" %* && exit
 	:: Create the new rule
-	netsh advfirewall firewall add rule name="Hearthstone Skip Combat" dir=out action=block protocol=TCP remoteport=3724
+	netsh advfirewall firewall add rule name="Hearthstone Skip Combat" dir=out action=block protocol=TCP remoteport=1119
 
 	:: Check if rule is indeed created
 	netsh advfirewall firewall show rule name="Hearthstone Skip Combat" > NUL 2>&1
