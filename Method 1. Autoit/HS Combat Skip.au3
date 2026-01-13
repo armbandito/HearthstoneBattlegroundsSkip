@@ -1,9 +1,13 @@
+#include <Array.au3>
+
 Global Const $hNTDLL = DllOpen("ntdll.dll")
 Global Const $hKERNEL32 = DllOpen("kernel32.dll")
 Global Const $hIPHLPAPI = DllOpen("iphlpapi.dll")
 Global Const $hPSAPI = DllOpen("psapi.dll")
 Global Const $hWTSAPI32 = DllOpen("wtsapi32.dll")
 Global $aTCPArray
+
+Global $aportsListArray[0]
 
 Global $iIsAdmin = IsAdmin()
 If Not $iIsAdmin  Then
@@ -17,24 +21,73 @@ While 1
    Sleep(100)
 WEnd
 
+Func _MonitorHearthstonePorts()
+   $ret = _CV_GetConnections($aTCPArray)
+   if $ret Then
+	  MsgBox(0, "Hearthstone Battle Skip", "Failed to find connections.")
+	  Return 1
+   EndIf
+   dim $NewHsPorts[0]
+   ;find all hearthstone ports
+   For $x=0 to UBound($aTCPArray) -1
+	  Local $name = $aTCPArray[$x][0]
+	  If $name == "Hearthstone.exe" Then
+		 dim $list[4] = [$aTCPArray[$x][1] , $aTCPArray[$x][2] , $aTCPArray[$x][3] , $aTCPArray[$x][4]]
+		 _ArrayAdd($NewHsPorts, $list, 0 , "|" , @CRLF, $ARRAYFILL_FORCE_SINGLEITEM)
+	  EndIf
+   Next
+   Return $NewHsPorts
+EndFunc
+
 Func _DropHearthstone()
    $ret = _CV_GetConnections($aTCPArray)
    if $ret Then
+	  MsgBox(0, "Hearthstone Battle Skip", "Failed to find connections.")
 	  Return 1
    EndIf
 
-   Local $closedcon = False
+   ;first try port that is sometimes used for game connections
    For $x=0 to UBound($aTCPArray) -1
 	  Local $name = $aTCPArray[$x][0]
 	  Local $remoteport = $aTCPArray[$x][4]
 	  If $name == "Hearthstone.exe" And $remoteport == "3724" Then
 		 _CV_DisableConnectionSimple($aTCPArray[$x][1], $aTCPArray[$x][2], $aTCPArray[$x][3], $aTCPArray[$x][4])
 		 Return 0
+
 	  EndIf
    Next
 
-   ;didnt close connection
-   MsgBox(0, "Hearthstone Battle Skip", "Failed to find connection, you are not in a match, or your game is already over.")
+   ;kill youngest (highest) port
+
+   Local $Connections[0]
+
+   For $x=0 to UBound($aTCPArray) -1
+	  Local $name = $aTCPArray[$x][0]
+	  Local $remoteport = $aTCPArray[$x][4]
+	  If $name == "Hearthstone.exe" And $remoteport == "1119" Then
+		 ConsoleWrite($aTCPArray[$x][1] & " - " & $aTCPArray[$x][2] & " - " & $aTCPArray[$x][3] & " - " & $aTCPArray[$x][4] & @CRLF)
+		 Local $Add[4] = [$aTCPArray[$x][1], $aTCPArray[$x][2], $aTCPArray[$x][3], $aTCPArray[$x][4]]
+		 _ArrayAdd($Connections, $Add, -1, -1, -1, $ARRAYFILL_FORCE_SINGLEITEM)
+	  EndIf
+   Next
+
+   If UBound($Connections) == 1 Then
+	  MsgBox(0, "Hearthstone Battle Skip", "Failed to find game connection, you are not in a match, or your game is already over.")
+   EndIf
+
+   If UBound($Connections) == 2 Then
+	  ConsoleWrite("Found 2 connections, killing newest" & @CRLF)
+	  $first = $Connections[0]
+	  $second = $Connections[1]
+	  If $first[0] > $second[0] Then ; check which local port is the biggest
+		 _CV_DisableConnectionSimple($first[0], $first[1], $first[2], $first[3])
+	  Else
+		 _CV_DisableConnectionSimple($second[0], $second[1], $second[2], $second[3])
+	  EndIf
+	  Return 0
+   EndIf
+
+   MsgBox(0, "Hearthstone Battle Skip", "Failed to find any connection, you are not in a match, or your game is already over.")
 EndFunc
 
 Func _CV_GetExtendedTcpTable()
