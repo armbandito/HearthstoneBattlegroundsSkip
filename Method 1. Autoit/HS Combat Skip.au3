@@ -7,6 +7,8 @@ Global Const $hPSAPI = DllOpen("psapi.dll")
 Global Const $hWTSAPI32 = DllOpen("wtsapi32.dll")
 Global $aTCPArray
 
+Global $ProcessingDrop = False
+
 Global $aportsListArray[0]
 
 Global $iIsAdmin = IsAdmin()
@@ -15,34 +17,27 @@ If Not $iIsAdmin  Then
    Exit
 EndIf
 
-HotKeySet("{F5}", "_DropHearthstone")
-
 While 1
+   If WinActive("Hearthstone") Then
+	  ;hearthstone focuesd, enable hotkey
+	  HotKeySet("{F5}", "_DropHearthstone")
+   Else
+	  ;hearthstone unfocuesd, disable hotkey
+	  HotKeySet("{F5}")
+   EndIf
    Sleep(100)
 WEnd
 
-Func _MonitorHearthstonePorts()
-   $ret = _CV_GetConnections($aTCPArray)
-   if $ret Then
-	  MsgBox(0, "Hearthstone Battle Skip", "Failed to find connections.")
-	  Return 1
-   EndIf
-   dim $NewHsPorts[0]
-   ;find all hearthstone ports
-   For $x=0 to UBound($aTCPArray) -1
-	  Local $name = $aTCPArray[$x][0]
-	  If $name == "Hearthstone.exe" Then
-		 dim $list[4] = [$aTCPArray[$x][1] , $aTCPArray[$x][2] , $aTCPArray[$x][3] , $aTCPArray[$x][4]]
-		 _ArrayAdd($NewHsPorts, $list, 0 , "|" , @CRLF, $ARRAYFILL_FORCE_SINGLEITEM)
-	  EndIf
-   Next
-   Return $NewHsPorts
-EndFunc
-
 Func _DropHearthstone()
+   If $ProcessingDrop Then
+	  Return 0
+   EndIf
+   $ProcessingDrop = True
+
    $ret = _CV_GetConnections($aTCPArray)
    if $ret Then
 	  MsgBox(0, "Hearthstone Battle Skip", "Failed to find connections.")
+	  $ProcessingDrop = False
 	  Return 1
    EndIf
 
@@ -52,13 +47,12 @@ Func _DropHearthstone()
 	  Local $remoteport = $aTCPArray[$x][4]
 	  If $name == "Hearthstone.exe" And $remoteport == "3724" Then
 		 _CV_DisableConnectionSimple($aTCPArray[$x][1], $aTCPArray[$x][2], $aTCPArray[$x][3], $aTCPArray[$x][4])
+		 $ProcessingDrop = False
 		 Return 0
-
 	  EndIf
    Next
 
-   ;kill youngest (highest) port
-
+   ;then use other port that is double up, and kill youngest (highest) port
    Local $Connections[0]
 
    For $x=0 to UBound($aTCPArray) -1
@@ -73,9 +67,9 @@ Func _DropHearthstone()
 
    If UBound($Connections) == 1 Then
 	  MsgBox(0, "Hearthstone Battle Skip", "Failed to find game connection, you are not in a match, or your game is already over.")
-   EndIf
-
-   If UBound($Connections) == 2 Then
+	  $ProcessingDrop = False
+	  Return 0
+   ElseIf UBound($Connections) == 2 Then
 	  ConsoleWrite("Found 2 connections, killing newest" & @CRLF)
 	  $first = $Connections[0]
 	  $second = $Connections[1]
@@ -84,6 +78,7 @@ Func _DropHearthstone()
 	  Else
 		 _CV_DisableConnectionSimple($second[0], $second[1], $second[2], $second[3])
 	  EndIf
+	  $ProcessingDrop = False
 	  Return 0
    EndIf
 
